@@ -184,3 +184,48 @@ class SupervisorOutput(BaseModel):
     risk: RiskManagerOutput
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class BacktestConfig(BaseModel):
+    """Configuration for simple historical simulation."""
+
+    ticker: str
+    lookback_bars: int = Field(default=60, ge=20)
+    initial_capital: float = Field(default=100_000.0, gt=0.0)
+    position_size: float = Field(default=1.0, ge=0.0, le=1.0)
+    transaction_cost_bps: float = Field(default=2.0, ge=0.0)
+
+
+class BacktestSignal(BaseModel):
+    """Single recommendation emitted by a recommendation engine."""
+
+    recommendation: Recommendation
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    rationale: str = ""
+
+
+class BacktestStep(BaseModel):
+    """Per candlebar backtest record."""
+
+    timestamp: datetime
+    close: float
+    market_return: float
+    strategy_return: float
+    position: float
+    equity: float
+    recommendation: Recommendation
+    confidence: float
+
+
+class BacktestResult(BaseModel):
+    """Aggregate backtest output and equity curve."""
+
+    config: BacktestConfig
+    total_return: float
+    annualized_return: float
+    annualized_volatility: float
+    sharpe_ratio: float
+    max_drawdown: float
+    win_rate: float
+    trades: int
+    steps: list[BacktestStep] = Field(default_factory=list)

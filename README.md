@@ -26,6 +26,7 @@ LangGraph was selected instead of CrewAI because the workflow needs explicit typ
 - Agent A fundamental sentiment from retrieved evidence and LLM summarization
 - Agent C policy-based risk manager with configurable constraints
 - LangGraph supervisor orchestration with structured final recommendation
+- Simple backtest module for supervisor-style recommendations with return/risk metrics
 - Async I/O for market/news fetching and model calls
 
 ## Tech Stack
@@ -79,6 +80,11 @@ uv run pytest
 CLI:
 ```bash
 uv run qfin-agent AAPL --period 6mo --interval 1d
+```
+
+Backtest:
+```bash
+uv run qfin-agent AAPL --backtest --period 2y --interval 1d --lookback-bars 60 --position-size 0.5
 ```
 
 Notebook:
