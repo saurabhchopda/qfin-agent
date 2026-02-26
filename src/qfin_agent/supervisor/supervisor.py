@@ -14,13 +14,18 @@ from qfin_agent.agents.risk_manager import RiskManager
 from qfin_agent.agents.technical import TechnicalAnalyst
 from qfin_agent.config import Settings
 from qfin_agent.models.schemas import (
+    DebateConflict,
+    DebateTranscript,
+    DebateTurn,
     Recommendation,
+    RiskDecision,
     RiskEvaluationInput,
+    FundamentalAnalysisOutput,
+    RiskManagerOutput,
     SupervisorOutput,
     SupervisorRequest,
     TechnicalAnalysisOutput,
-    FundamentalAnalysisOutput,
-    RiskManagerOutput,
+    TrendDirection,
 )
 
 
@@ -118,6 +123,14 @@ class SupervisorOrchestrator:
             final_recommendation=recommendation,
             confidence=confidence,
             rationale=rationale,
+            debate_transcript=self._build_debate_transcript(
+                fundamental=fundamental,
+                technical=technical,
+                risk=risk,
+                final_recommendation=recommendation,
+                final_confidence=confidence,
+                final_rationale=rationale,
+            ),
             fundamental=fundamental,
             technical=technical,
             risk=risk,
@@ -169,6 +182,125 @@ class SupervisorOrchestrator:
         rationale = str(payload.get("rationale", "Supervisor response did not include rationale."))
 
         return recommendation, confidence, rationale
+
+    def _build_debate_transcript(
+        self,
+        fundamental: FundamentalAnalysisOutput,
+        technical: TechnicalAnalysisOutput,
+        risk: RiskManagerOutput,
+        final_recommendation: Recommendation,
+        final_confidence: float,
+        final_rationale: str,
+    ) -> DebateTranscript:
+        fundamental_stance = self._recommendation_from_sentiment(fundamental.sentiment_score)
+        technical_stance = self._recommendation_from_technical(
+            technical.trend,
+            technical.momentum,
+        )
+
+        turns = [
+            DebateTurn(
+                speaker="fundamental_analyst",
+                stance=fundamental_stance,
+                confidence=min(1.0, round(abs(fundamental.sentiment_score), 3)),
+                thesis=fundamental.summary,
+                key_points=[
+                    f"Sentiment score={fundamental.sentiment_score:.2f}",
+                    "Evidence selected from retrieved news and filings context.",
+                ],
+                citations=[f"{item.title} | {item.source}" for item in fundamental.evidence[:3]],
+            ),
+            DebateTurn(
+                speaker="technical_analyst",
+                stance=technical_stance,
+                confidence=technical.confidence,
+                thesis=(
+                    f"Trend is {technical.trend.value}, momentum is {technical.momentum}, "
+                    f"volatility regime is {technical.volatility_regime.value}."
+                ),
+                key_points=technical.rationale,
+            ),
+            DebateTurn(
+                speaker="risk_manager",
+                stance=risk.recommendation,
+                confidence=self._risk_confidence(risk.decision),
+                thesis=risk.rationale,
+                key_points=[f"Risk decision={risk.decision.value}"],
+                citations=[f"{item.rule}: {item.message}" for item in risk.violations],
+            ),
+            DebateTurn(
+                speaker="supervisor",
+                stance=final_recommendation,
+                confidence=final_confidence,
+                thesis=final_rationale,
+                key_points=["Synthesized final action from all agent arguments."],
+            ),
+        ]
+
+        conflicts: list[DebateConflict] = []
+        if fundamental_stance != technical_stance:
+            conflicts.append(
+                DebateConflict(
+                    topic="signal_divergence",
+                    participants=["fundamental_analyst", "technical_analyst"],
+                    description=(
+                        "Fundamental and technical agents recommended different actions."
+                    ),
+                    resolution=f"Supervisor prioritized {final_recommendation.value}.",
+                )
+            )
+        if risk.recommendation != final_recommendation:
+            conflicts.append(
+                DebateConflict(
+                    topic="risk_override",
+                    participants=["risk_manager", "supervisor"],
+                    description="Supervisor output differs from risk manager recommendation.",
+                    resolution=f"Final decision remains {final_recommendation.value}.",
+                )
+            )
+
+        stances = [
+            (fundamental_stance, turns[0].confidence),
+            (technical_stance, turns[1].confidence),
+            (risk.recommendation, turns[2].confidence),
+            (final_recommendation, final_confidence),
+        ]
+        support = [confidence for stance, confidence in stances if stance == final_recommendation]
+        consensus_strength = round(sum(support) / max(len(stances), 1), 3)
+
+        return DebateTranscript(
+            turns=turns,
+            conflicts=conflicts,
+            consensus_strength=max(0.0, min(1.0, consensus_strength)),
+            final_resolution=(
+                f"Final action {final_recommendation.value} at confidence {final_confidence:.2f}. "
+                f"Risk decision was {risk.decision.value}."
+            ),
+        )
+
+    @staticmethod
+    def _recommendation_from_sentiment(sentiment: float) -> Recommendation:
+        if sentiment > 0.2:
+            return Recommendation.BUY
+        if sentiment < -0.2:
+            return Recommendation.SELL
+        return Recommendation.HOLD
+
+    @staticmethod
+    def _recommendation_from_technical(trend: TrendDirection, momentum: str) -> Recommendation:
+        if trend == TrendDirection.BULLISH and momentum == "positive":
+            return Recommendation.BUY
+        if trend == TrendDirection.BEARISH and momentum == "negative":
+            return Recommendation.SELL
+        return Recommendation.HOLD
+
+    @staticmethod
+    def _risk_confidence(decision: RiskDecision) -> float:
+        if decision == RiskDecision.APPROVE:
+            return 0.8
+        if decision == RiskDecision.FLAG:
+            return 0.7
+        return 0.9
 
 
 def _safe_json_parse(raw: str) -> dict:

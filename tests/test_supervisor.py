@@ -70,3 +70,6 @@ async def test_supervisor_orchestrator_runs_without_openai() -> None:
     assert result.ticker == "AAPL"
     assert result.final_recommendation in {"buy", "sell", "hold"}
     assert 0.0 <= result.confidence <= 1.0
+    assert result.debate_transcript.turns
+    assert result.debate_transcript.turns[-1].speaker == "supervisor"
+    assert 0.0 <= result.debate_transcript.consensus_strength <= 1.0

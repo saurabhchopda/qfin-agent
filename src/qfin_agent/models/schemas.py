@@ -172,6 +172,35 @@ class SupervisorRequest(BaseModel):
     portfolio: PortfolioState
 
 
+class DebateTurn(BaseModel):
+    """Single agent contribution in the supervisor debate."""
+
+    speaker: str
+    stance: Recommendation
+    confidence: float = Field(ge=0.0, le=1.0)
+    thesis: str
+    key_points: list[str] = Field(default_factory=list)
+    citations: list[str] = Field(default_factory=list)
+
+
+class DebateConflict(BaseModel):
+    """Conflict detected across agent recommendations."""
+
+    topic: str
+    participants: list[str] = Field(default_factory=list)
+    description: str
+    resolution: str
+
+
+class DebateTranscript(BaseModel):
+    """Structured transcript of debate turns and resolution."""
+
+    turns: list[DebateTurn] = Field(default_factory=list)
+    conflicts: list[DebateConflict] = Field(default_factory=list)
+    consensus_strength: float = Field(ge=0.0, le=1.0)
+    final_resolution: str
+
+
 class SupervisorOutput(BaseModel):
     """Top-level workflow output."""
 
@@ -179,6 +208,7 @@ class SupervisorOutput(BaseModel):
     final_recommendation: Recommendation
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
+    debate_transcript: DebateTranscript
     fundamental: FundamentalAnalysisOutput
     technical: TechnicalAnalysisOutput
     risk: RiskManagerOutput
