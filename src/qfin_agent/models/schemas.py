@@ -259,3 +259,71 @@ class BacktestResult(BaseModel):
     win_rate: float
     trades: int
     steps: list[BacktestStep] = Field(default_factory=list)
+
+
+class BacktestSummary(BaseModel):
+    """Compact backtest metrics used by walk-forward evaluation."""
+
+    total_return: float
+    annualized_return: float
+    annualized_volatility: float
+    sharpe_ratio: float
+    max_drawdown: float
+    win_rate: float
+    trades: int
+    final_equity: float
+
+
+class WalkForwardConfig(BaseModel):
+    """Configuration for walk-forward validation."""
+
+    ticker: str
+    lookback_bars: int = Field(default=60, ge=20)
+    train_bars: int = Field(default=126, ge=20)
+    test_bars: int = Field(default=63, ge=20)
+    step_bars: int = Field(default=63, ge=1)
+    initial_capital: float = Field(default=100_000.0, gt=0.0)
+    position_size: float = Field(default=1.0, ge=0.0, le=1.0)
+    transaction_cost_bps: float = Field(default=2.0, ge=0.0)
+
+
+class WalkForwardWindowResult(BaseModel):
+    """Per-window walk-forward evaluation result."""
+
+    window_index: int = Field(ge=1)
+    train_start: datetime
+    train_end: datetime
+    test_start: datetime
+    test_end: datetime
+    regime: str
+    supervisor: BacktestSummary
+    benchmark: BacktestSummary
+    excess_return: float
+
+
+class RegimeAggregate(BaseModel):
+    """Aggregate performance within a market regime."""
+
+    regime: str
+    windows: int = Field(ge=0)
+    avg_excess_return: float
+    outperformance_rate: float = Field(ge=0.0, le=1.0)
+
+
+class WalkForwardAggregate(BaseModel):
+    """Portfolio-level aggregates across all walk-forward windows."""
+
+    total_windows: int = Field(ge=0)
+    supervisor_avg_return: float
+    benchmark_avg_return: float
+    avg_excess_return: float
+    outperformance_rate: float = Field(ge=0.0, le=1.0)
+    regimes: list[RegimeAggregate] = Field(default_factory=list)
+
+
+class WalkForwardResult(BaseModel):
+    """Full walk-forward output with windows and aggregated metrics."""
+
+    config: WalkForwardConfig
+    windows: list[WalkForwardWindowResult] = Field(default_factory=list)
+    aggregate: WalkForwardAggregate

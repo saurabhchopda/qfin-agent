@@ -26,14 +26,15 @@ LangGraph was selected instead of CrewAI because the workflow needs explicit typ
 - Agent A fundamental sentiment from retrieved evidence and LLM summarization
 - Agent C policy-based risk manager with configurable constraints
 - LangGraph supervisor orchestration with structured final recommendation
+- Rich `debate_transcript` object capturing turns, conflicts, and final resolution
 - Simple backtest module for supervisor-style recommendations with return/risk metrics
+- Walk-forward evaluation with rolling windows and benchmark comparison
 - Async I/O for market/news fetching and model calls
 
 ## Tech Stack
 - Python 3.12+
 - `uv` for dependency management
 - LangGraph + LangChain
-- OpenAI (`gpt-5.1` for agents, `gpt-5.2` for supervisor)
 - FAISS vector store
 - yfinance for OHLCV data
 - RSS/Finnhub free news feeds for fundamentals
@@ -48,6 +49,10 @@ qfin-agent/
 │   │   ├── technical.py
 │   │   └── risk_manager.py
 │   ├── supervisor/supervisor.py
+│   ├── backtest/
+│   │   ├── backtester.py
+│   │   ├── supervisor_engine.py
+│   │   └── walk_forward.py
 │   ├── rag/
 │   │   ├── ingest.py
 │   │   ├── embeddings.py
@@ -85,6 +90,11 @@ uv run qfin-agent AAPL --period 6mo --interval 1d
 Backtest:
 ```bash
 uv run qfin-agent AAPL --backtest --period 2y --interval 1d --lookback-bars 60 --position-size 0.5
+```
+
+Walk-forward:
+```bash
+uv run qfin-agent AAPL --walk-forward --period 5y --interval 1d --lookback-bars 60 --train-bars 126 --test-bars 63 --step-bars 63
 ```
 
 Notebook:
